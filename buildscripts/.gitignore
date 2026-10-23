@@ -4,3 +4,4 @@ prefix
 prefix64
 *.tgz
 sources
+release

@@ -20,8 +20,9 @@ android {
         ndkPath = props.getProperty('ndkRoot', '')
     }
 
-    androidResources {
-        enable = false
+    // licence notices written by buildscripts/katari-release.sh, shipped as assets/libmpv/
+    sourceSets {
+        main.assets.directories.add('build/generated/notices')
     }
 }
 

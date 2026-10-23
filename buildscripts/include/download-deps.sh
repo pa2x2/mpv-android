@@ -6,8 +6,9 @@
 [ -z "$WGET" ] && WGET=wget
 
 # Every source is pinned (see depinfo.sh). The archives are kept in sources/ so that
-# a release can publish exactly what was built.
+# a release can publish exactly what was built; sources/SHA256SUMS lists them.
 mkdir -p deps sources
+: >sources/SHA256SUMS
 
 sha256 () {
 	if command -v sha256sum >/dev/null; then
@@ -20,6 +21,7 @@ sha256 () {
 # fetch <dir> <url> <sha256> [<archive name>]
 fetch () {
 	local dir=deps/$1 archive=sources/${4:-${2##*/}}
+	echo "$3  ${archive#sources/}" >>sources/SHA256SUMS
 	[ -d "$dir" ] && return 0
 	if [ ! -f "$archive" ]; then
 		$WGET "$2" -O "$archive.part"
@@ -38,19 +40,21 @@ fetch () {
 # fetch_git <dir> <url> <tag> <commit> [<submodule>...]
 # Also packs the checkout (with its submodules) into sources/, since there is no release archive.
 fetch_git () {
-	local dir=deps/$1 url=$2 tag=$3 commit=$4
+	local dir=deps/$1 url=$2 tag=$3 commit=$4 archive=sources/$1-$3.tar.gz
 	shift 4
-	[ -d "$dir" ] && return 0
-	git clone --depth 1 -b "$tag" "$url" "$dir"
-	local actual
-	actual=$(git -C "$dir" rev-parse HEAD)
-	if [[ "$actual" != "$commit" ]]; then
-		printf >&2 'Commit mismatch for %s %s:\n  expected %s\n  got      %s\n' "$url" "$tag" "$commit" "$actual"
-		rm -rf "$dir"
-		exit 1
+	if [ ! -d "$dir" ]; then
+		git clone --depth 1 -b "$tag" "$url" "$dir"
+		local actual
+		actual=$(git -C "$dir" rev-parse HEAD)
+		if [[ "$actual" != "$commit" ]]; then
+			printf >&2 'Commit mismatch for %s %s:\n  expected %s\n  got      %s\n' "$url" "$tag" "$commit" "$actual"
+			rm -rf "$dir"
+			exit 1
+		fi
+		[ $# -gt 0 ] && git -C "$dir" submodule update --init --depth 1 -- "$@"
+		tar -cf - --exclude=.git --exclude='_build*' -C deps "${dir#deps/}" | gzip -n >"$archive"
 	fi
-	[ $# -gt 0 ] && git -C "$dir" submodule update --init --depth 1 -- "$@"
-	tar -cf - --exclude=.git -C deps "${dir#deps/}" | gzip -n >"sources/${dir#deps/}-$tag.tar.gz"
+	echo "$(sha256 "$archive")  ${archive#sources/}" >>sources/SHA256SUMS
 }
 
 fetch mbedtls https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-$v_mbedtls/mbedtls-$v_mbedtls.tar.bz2 $sha_mbedtls

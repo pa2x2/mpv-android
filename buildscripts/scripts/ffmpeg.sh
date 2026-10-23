@@ -29,7 +29,9 @@ args=(
 	--extra-cflags="-I$prefix_dir/include $cpuflags" --extra-ldflags="-L$prefix_dir/lib"
 
 	--enable-{jni,mediacodec,mbedtls,libdav1d,libxml2} --disable-vulkan
-	--disable-static --enable-shared --enable-{gpl,version3}
+	--disable-static --enable-shared
+	# LGPL build: no --enable-gpl. version3 (LGPLv3) is required by mbedtls
+	--enable-version3
 
 	# disable unneeded parts
 	--disable-{stripping,doc,programs}

@@ -55,7 +55,10 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := libavdevice
 LOCAL_SRC_FILES := $(PREFIX)/lib/$(LOCAL_MODULE).so
 LOCAL_EXPORT_C_INCLUDES := $(PREFIX)/include
+# only include if library file exists
+ifneq (,$(wildcard $(LOCAL_SRC_FILES)))
 include $(PREBUILT_SHARED_LIBRARY)
+endif
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := libmpv

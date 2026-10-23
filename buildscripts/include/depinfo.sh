@@ -62,7 +62,8 @@ dep_libass=(freetype2 fontconfig fribidi harfbuzz unibreak)
 dep_lua=()
 dep_libplacebo=()
 dep_curl=(mbedtls)
-dep_mpv=(ffmpeg libass lua libplacebo curl)
+# lua and curl are not built: an embedding app needs no scripts, and FFmpeg does the HTTP
+dep_mpv=(ffmpeg libass libplacebo)
 dep_mpv_android=(mpv)
 
 

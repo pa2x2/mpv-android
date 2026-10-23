@@ -73,12 +73,8 @@ fetch fontconfig https://gitlab.freedesktop.org/api/v4/projects/890/packages/gen
 
 fetch libass https://github.com/libass/libass/releases/download/$v_libass/libass-$v_libass.tar.xz $sha_libass
 
-fetch lua https://www.lua.org/ftp/lua-$v_lua.tar.gz $sha_lua
-
 # the demos submodule is left out, demos aren't built
 fetch_git libplacebo https://github.com/haasn/libplacebo v$v_libplacebo $commit_libplacebo \
 	3rdparty/{glad,jinja,markupsafe,fast_float,Vulkan-Headers}
-
-fetch curl https://curl.se/download/curl-$v_curl.tar.gz $sha_curl
 
 fetch mpv https://github.com/mpv-player/mpv/archive/$v_mpv.tar.gz $sha_mpv mpv-$v_mpv.tar.gz

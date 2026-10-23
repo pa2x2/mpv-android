@@ -1,0 +1,73 @@
+name: katari-release
+
+# Builds the LGPL libmpv AAR for Katari and publishes it with its corresponding source.
+# All the work is in buildscripts/katari-release.sh, which also runs locally.
+# - push a tag libmpv-<version> (e.g. libmpv-0.41.0.20261021-ff9.0.2-1): build and create the release
+# - run it by hand: build only, the files are attached to the run as an artifact
+
+on:
+  push:
+    tags:
+      - 'libmpv-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          java-version: '21'
+          distribution: temurin
+
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install autoconf pkgconf libtool ninja-build python3-pip gperf nasm
+          sudo pip3 install meson
+
+      - name: Build
+        env:
+          IN_CI: 1
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ "$REF_TYPE" == tag ]]; then
+            version=${REF_NAME#libmpv-}
+            buildscripts/katari-release.sh --build "${version##*-}" --expect-version "$version"
+          else
+            buildscripts/katari-release.sh
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: libmpv-android
+          path: buildscripts/release/
+
+      - name: Create the release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          cd buildscripts/release
+          {
+            echo "LGPL build of libmpv and FFmpeg for Katari, from \`buildscripts/katari-release.sh\`."
+            echo
+            echo "- \`*.aar\`: the native libraries for armeabi-v7a, arm64-v8a and x86_64, and MPVLib"
+            echo "- \`*-sources.tar\`: the corresponding source (upstream archives and build scripts)"
+            echo "- \`*-THIRD_PARTY_LICENSES.txt\`, \`*-third-party.json\`: licence inventory and texts"
+            echo "- \`*-licence-evidence.txt\`: licence settings read back from the build"
+            echo
+            echo '```'
+            cat ./*-SHA256SUMS.txt
+            echo '```'
+          } >"$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" ./* --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"

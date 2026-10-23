@@ -6,6 +6,8 @@ on:
 
 jobs:
   linux:
+    # the Katari fork builds with katari-release.yml instead
+    if: github.repository == 'mpv-android/mpv-android'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7

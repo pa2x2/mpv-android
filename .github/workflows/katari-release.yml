@@ -2,8 +2,9 @@ name: katari-release
 
 # Builds the LGPL libmpv AAR for Katari and publishes it with its corresponding source.
 # All the work is in buildscripts/katari-release.sh, which also runs locally.
-# - push a tag libmpv-<version> (e.g. libmpv-0.41.0.20261021-ff9.0.2-1): build and create the release
-# - run it by hand: build only, the files are attached to the run as an artifact
+# - push a tag libmpv-<version> (e.g. libmpv-2026-10-23-1): build and create the release;
+#   <version> is whatever follows "libmpv-" and names the release files
+# - run it by hand: build only (version "dev"), the files are attached to the run as an artifact
 
 on:
   push:
@@ -40,8 +41,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: |
           if [[ "$REF_TYPE" == tag ]]; then
-            version=${REF_NAME#libmpv-}
-            buildscripts/katari-release.sh --build "${version##*-}" --expect-version "$version"
+            buildscripts/katari-release.sh --version "${REF_NAME#libmpv-}"
           else
             buildscripts/katari-release.sh
           fi

@@ -10,32 +10,34 @@
 # - ...-SHA256SUMS.txt
 # .github/workflows/katari-release.yml only runs this script. Needs bash 4 and python3.
 #
-# Usage: ./katari-release.sh [--arch <arch>]... [--build <n>] [--expect-version <version>]
-#   --arch            armv7l, arm64 or x86_64, repeatable (default: all three)
-#   --build           build number, the last part of the version (default: 1)
-#   --expect-version  fail unless the computed version is this one (the workflow passes the tag's)
+# Usage: ./katari-release.sh [--arch <arch>]... [--version <version>]
+#   --arch     armv7l, arm64 or x86_64, repeatable (default: all three)
+#   --version  the release version; the workflow passes the part of the tag after "libmpv-"
+#              (default: dev). The mpv and FFmpeg versions are in the notices, not in this.
 
 cd "$( dirname "${BASH_SOURCE[0]}" )"
 . ./include/depinfo.sh
 
 archs=()
-build=1
-expect=
+version=dev
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--arch) shift; archs+=("$1") ;;
-		--build) shift; build=$1 ;;
-		--expect-version) shift; expect=$1 ;;
+		--version) shift; version=$1 ;;
 		*) echo "Unknown argument $1" >&2; exit 1 ;;
 	esac
 	shift
 done
 [ ${#archs[@]} -eq 0 ] && archs=(armv7l arm64 x86_64)
 
-# <mpv release>.<mpv commit date>-ff<FFmpeg release>-<build>; <build> counts releases of the same upstream versions
-version=$v_mpv_base.$v_mpv_date-ff$v_ffmpeg-$build
 name=libmpv-android-$version
-repo_url=${KATARI_REPO_URL:-https://github.com/pa2x2/mpv-android}
+# the repository the release is published from: GitHub Actions sets these, locally it's origin
+if [ -n "$GITHUB_REPOSITORY" ]; then
+	repo_url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY
+else
+	repo_url=$(git remote get-url origin)
+	repo_url=${repo_url%.git}
+fi
 out=$PWD/release
 notices=$PWD/../libmpv/build/generated/notices/libmpv
 aar=../libmpv/build/outputs/aar/libmpv-release.aar
@@ -53,9 +55,7 @@ abi () {
 	esac
 }
 
-if [[ -n "$expect" && "$expect" != "$version" ]]; then
-	die "This tree builds version $version, not $expect"
-fi
+[[ "$version" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]] || die "Invalid version '$version'"
 for arch in "${archs[@]}"; do abi "$arch" >/dev/null; done
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
 	die "The working tree has uncommitted changes, so the source bundle wouldn't match the build"
@@ -212,7 +212,7 @@ To rebuild (Linux; see mpv-android/buildscripts/README.md for the host packages)
     mkdir -p mpv-android/buildscripts/sources mpv-android/buildscripts/deps
     cp upstream/* mpv-android/buildscripts/sources/
     tar -xzf upstream/libplacebo-v$v_libplacebo.tar.gz -C mpv-android/buildscripts/deps
-    cd mpv-android/buildscripts && ./katari-release.sh --build $build
+    cd mpv-android/buildscripts && ./katari-release.sh --version $version
 The Android SDK and NDK ($v_ndk) are downloaded by the build from Google.
 EOF
 tar -cf "$out/$name-sources.tar" -C "$bundle" README.txt upstream mpv-android

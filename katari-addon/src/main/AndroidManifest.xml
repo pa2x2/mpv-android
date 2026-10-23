@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- No code and nothing to launch: Katari loads the native libraries from this package's
+     nativeLibraryDir and checks the release against its MPVLib with the meta-data below. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:hasCode="false"
+        android:allowBackup="false"
+        android:label="Katari mpv add-on">
+
+        <!-- the libmpv release the libraries come from, and its MPVLib.GLUE_LEVEL -->
+        <meta-data
+            android:name="katari.libmpv.version"
+            android:value="${katariVersion}" />
+        <meta-data
+            android:name="katari.libmpv.glue"
+            android:value="${katariGlue}" />
+    </application>
+</manifest>

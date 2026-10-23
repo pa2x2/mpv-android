@@ -9,24 +9,39 @@
 # - ...-licence-evidence.txt: the licence settings read back from the build
 # - ...-load-order.json: the order in which a host loads the libraries, per ABI (MPVLib doesn't
 #   load them), generated from their DT_NEEDED entries; also in the AAR as assets/libmpv/
+# - katari-mpv-<abi>-<version>.apk: the Katari mpv add-on (app.katari.mpv) for each ABI, an APK
+#   with no code holding the AAR's libraries and assets/libmpv/, built by ../katari-addon
 # - ...-SHA256SUMS.txt
 # It also fails if the JNI glue changed without a new MPVLib.GLUE_LEVEL (see katari-glue.py).
-# .github/workflows/katari-release.yml only runs this script. Needs bash 4 and python3.
+# .github/workflows/katari-release.yml only runs this script. Needs bash 4, python3 and a JDK.
 #
-# Usage: ./katari-release.sh [--arch <arch>]... [--version <version>]
+# Usage: ./katari-release.sh [--arch <arch>]... [--version <version>] [--release]
 #   --arch     armv7l, arm64 or x86_64, repeatable (default: all three)
 #   --version  the release version; the workflow passes the part of the tag after "libmpv-"
 #              (default: dev). The mpv and FFmpeg versions are in the notices, not in this.
+#   --release  a build to publish (the workflow passes it for tags): the version must be a
+#              release version (see version_code), and the APKs are signed with the key in
+#              KATARI_KEYSTORE (a keystore file), KATARI_KEYSTORE_PASSWORD, KATARI_KEY_ALIAS
+#              and KATARI_KEY_PASSWORD, which must all be set. Otherwise the APKs are signed
+#              with the Android debug key (~/.android/debug.keystore), like local Katari builds.
 
 cd "$( dirname "${BASH_SOURCE[0]}" )"
 . ./include/depinfo.sh
+. ./include/path.sh
+
+# the signing key's settings, out of the environment so the dependencies' builds don't see them
+ks_file=$KATARI_KEYSTORE ks_pass=$KATARI_KEYSTORE_PASSWORD
+key_alias=$KATARI_KEY_ALIAS key_pass=$KATARI_KEY_PASSWORD
+unset KATARI_KEYSTORE KATARI_KEYSTORE_PASSWORD KATARI_KEY_ALIAS KATARI_KEY_PASSWORD
 
 archs=()
 version=dev
+release=
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--arch) shift; archs+=("$1") ;;
 		--version) shift; version=$1 ;;
+		--release) release=1 ;;
 		*) echo "Unknown argument $1" >&2; exit 1 ;;
 	esac
 	shift
@@ -58,23 +73,108 @@ abi () {
 	esac
 }
 
+# The add-on's versionCode. A release version is YYYY-MM-DD-N, the date of the release and a
+# counter N from 1 to 99 without leading zeros, and gets YYYYMMDD * 100 + N: 2026-10-23-2 is
+# 2026102302. So the codes go up as long as no release is tagged with an earlier date than the
+# last one; --release checks that against the tags already pushed. Other versions are for local
+# builds only: YYYY-MM-DD-<anything else> (e.g. 2026-10-23-test) gets YYYYMMDD * 100, below that
+# day's releases, and dev gets 1. Anything else fails.
+version_code () { # <version> [release]
+	local v=$1
+	if [[ "$v" =~ ^(20[0-9]{2})-([0-9]{2})-([0-9]{2})-(.+)$ ]]; then
+		local date=${BASH_REMATCH[1]}${BASH_REMATCH[2]}${BASH_REMATCH[3]} n=${BASH_REMATCH[4]}
+		python3 -c 'import datetime, sys; datetime.date.fromisoformat(sys.argv[1])' \
+			"${v:0:10}" 2>/dev/null || return 1
+		if [[ "$n" =~ ^[1-9][0-9]?$ ]]; then
+			echo $(( 10#$date * 100 + n ))
+		elif [ -z "$2" ]; then
+			echo $(( 10#$date * 100 ))
+		else
+			return 1
+		fi
+	elif [[ "$v" == dev && -z "$2" ]]; then
+		echo 1
+	else
+		return 1
+	fi
+}
+
 [[ "$version" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]] || die "Invalid version '$version'"
+version_code=$(version_code "$version" ${release:+release}) || die \
+	"The version '$version' has no add-on versionCode: releases are YYYY-MM-DD-N, N from 1 to 99"
 for arch in "${archs[@]}"; do abi "$arch" >/dev/null; done
+if [ -n "$release" ]; then
+	# a later release must get a larger versionCode, or Android won't update the add-on to it
+	tags=$(git ls-remote --tags origin 'refs/tags/libmpv-*') || die "Can't list the tags of origin"
+	while read -r _ ref; do
+		tag=${ref#refs/tags/libmpv-} tag=${tag%^\{\}}
+		code=$(version_code "$tag" release) || continue
+		[[ "$tag" == "$version" || $code -lt $version_code ]] ||
+			die "libmpv-$tag has the versionCode $code, not less than $version_code for $version"
+	done <<<"$tags"
+fi
 
 # The JNI glue level the AAR's MPVLib declares; katari-glue.py checks it against classes.jar.
 glue=$(sed -n 's/^ *const val GLUE_LEVEL: Int = \([1-9][0-9]*\)$/\1/p' \
 	../libmpv/src/main/java/is/xyz/mpv/MPVLib.kt)
 [[ "$glue" =~ ^[1-9][0-9]*$ ]] || die "Can't read GLUE_LEVEL from MPVLib.kt"
+
+# The key that signs the add-on, and its certificate's SHA-256, which the APKs must have.
+keytool=${JAVA_HOME:+$JAVA_HOME/bin/}keytool
+if [ -n "$release" ]; then
+	for v in ks_file:KATARI_KEYSTORE ks_pass:KATARI_KEYSTORE_PASSWORD key_alias:KATARI_KEY_ALIAS \
+			key_pass:KATARI_KEY_PASSWORD; do
+		n=${v%%:*}
+		[ -n "${!n}" ] || die "--release signs with Katari's key, but ${v#*:} isn't set"
+	done
+	[ -s "$ks_file" ] || die "The keystore $ks_file is missing or empty"
+else
+	ks_file=${ANDROID_USER_HOME:-$HOME/.android}/debug.keystore ks_pass=android
+	key_alias=androiddebugkey key_pass=android
+	if [ ! -e "$ks_file" ]; then
+		# what the Android Gradle plugin creates for local builds
+		mkdir -p "$(dirname "$ks_file")"
+		"$keytool" -genkeypair -keystore "$ks_file" -storepass android -alias androiddebugkey \
+			-keypass android -keyalg RSA -keysize 2048 -validity 10950 \
+			-dname 'CN=Android Debug,O=Android,C=US'
+	fi
+fi
+export KS_PASS=$ks_pass KEY_PASS=$key_pass
+cert=$("$keytool" -exportcert -rfc -keystore "$ks_file" -storepass:env KS_PASS -alias "$key_alias") ||
+	die "Can't read the certificate of '$key_alias' in $ks_file"
+unset KS_PASS KEY_PASS
+cert=$("$keytool" -J-Duser.language=en -printcert <<<"$cert")
+if [ -n "$release" ] && grep -q '^Owner: .*CN=Android Debug' <<<"$cert"; then
+	die "--release must not sign with an Android debug key"
+fi
+cert=$(sed -n 's/^\s*SHA256: //p' <<<"$cert" | tr -d : | tr A-F a-f)
+[[ "$cert" =~ ^[0-9a-f]{64}$ ]] || die "Can't read the certificate's SHA-256"
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
 	die "The working tree has uncommitted changes, so the source bundle wouldn't match the build"
 fi
 
-msg "Building $name for ${archs[*]}"
-rm -rf "$out" "$notices"
+msg "Building $name for ${archs[*]} (add-on versionCode $version_code, glue level $glue)"
+rm -rf "$out" "$notices" ../katari-addon/build
 mkdir -p "$out" "$notices"
 
 msg "Fetching the SDK, NDK and sources"
 ./download.sh
+
+tools=$ANDROID_HOME/build-tools/$v_sdk_build_tools
+# signature schemes v2 (as Katari's APKs) and v3; minSdk 29 needs no v1, incremental installs no v4
+sign_apk () { # <in> <out>
+	KS_PASS=$ks_pass KEY_PASS=$key_pass "$tools/apksigner" sign --ks "$ks_file" \
+		--ks-pass env:KS_PASS --ks-key-alias "$key_alias" --key-pass env:KEY_PASS \
+		--min-sdk-version 29 --v1-signing-enabled false --v2-signing-enabled true \
+		--v3-signing-enabled true --v4-signing-enabled false --out "$2" "$1"
+}
+# try the key on an empty APK now, so that a wrong key password fails before the build
+probe=$(mktemp -d)
+python3 -c 'import sys, zipfile; zipfile.ZipFile(sys.argv[1], "w").writestr("probe", "")' \
+	"$probe/unsigned.apk"
+sign_apk "$probe/unsigned.apk" "$probe/signed.apk" 2>/dev/null ||
+	die "Can't sign with the key '$key_alias' in $ks_file: is KATARI_KEY_PASSWORD right?"
+rm -rf "$probe"
 
 for arch in "${archs[@]}"; do
 	msg "Building the native libraries ($arch)"
@@ -195,7 +295,8 @@ abi_args=()
 for a in $want_abis; do abi_args+=(--abi "$a"); done
 load_order () {
 	./katari-load-order.py --readelf "$toolchain/bin/llvm-readelf" --sysroot "$toolchain/sysroot" \
-		--api "$api" --version "$version" "${abi_args[@]}" "$1"
+		--api "$api" --version "$version" --version-code "$version_code" --glue "$glue" \
+		"${abi_args[@]}" "$1"
 }
 load_order ../libmpv/src/main/libs >"$notices/load-order.json"
 cp "$notices/load-order.json" "$out/$name-load-order.json"
@@ -226,6 +327,64 @@ cp "$aar" "$out/$name.aar"
 msg "Checking the JNI glue (level $glue)"
 ./katari-glue.py check --aar "$aar" --level "$glue" --readelf "$toolchain/bin/llvm-readelf"
 
+msg "Building the mpv add-on"
+addon=../katari-addon/build
+mkdir -p "$addon/aar"
+unzip -q "$aar" 'jni/*' 'assets/*' -d "$addon/aar"
+(cd .. && ./gradlew :katari-addon:assembleRelease -PkatariVersion="$version" \
+	-PkatariVersionCode="$version_code" -PkatariGlue="$glue" -PkatariAbis="$(tr ' ' , <<<"${want_abis% }")")
+# the entries of a zip file under a directory, without the directory: <zip> <dir>
+entries () { unzip -Z1 "$1" "$2/*" | grep -v '/$' | sed "s|^$2/||" | sort; }
+check_addon () { # <abi> <apk>
+	local a=$1 apk=$2 manifest e
+	# signed only with the expected key, and the libraries page-aligned
+	[ "$("$tools/apksigner" verify --print-certs "$apk" | grep '^Signer .* SHA-256 digest: ')" == \
+		"Signer #1 certificate SHA-256 digest: $cert" ] || die "$apk isn't signed with $ks_file"
+	"$tools/zipalign" -c -P 16 4 "$apk" || die "$apk isn't aligned"
+	# the AAR's libraries for its ABI and its assets, byte for byte, and no code
+	[ "$(entries "$apk" "lib/$a")" == "$(entries "$aar" "jni/$a")" ] ||
+		die "$apk doesn't have the libraries of the AAR's jni/$a/"
+	[ "$(unzip -Z1 "$apk" 'lib/*' | grep -v "^lib/$a/")" == "" ] || die "$apk has other ABIs"
+	for e in $(entries "$aar" "jni/$a"); do
+		cmp -s <(unzip -p "$apk" "lib/$a/$e") <(unzip -p "$aar" "jni/$a/$e") ||
+			die "$apk: lib/$a/$e differs from the AAR's"
+	done
+	[ "$(entries "$apk" assets)" == "$(entries "$aar" assets)" ] || die "$apk lacks the AAR's assets"
+	for e in $(entries "$aar" assets); do
+		cmp -s <(unzip -p "$apk" "assets/$e") <(unzip -p "$aar" "assets/$e") ||
+			die "$apk: assets/$e differs from the AAR's"
+	done
+	! unzip -Z1 "$apk" | grep -q '\.dex$' || die "$apk has code"
+	# the manifest
+	"$tools/aapt2" dump badging "$apk" | grep -q "^launchable-activity" && die "$apk has a launcher entry"
+	manifest=$("$tools/aapt2" dump xmltree --file AndroidManifest.xml "$apk" |
+		sed 's/^ *//; s/ (Raw: .*//; s/ (line=[0-9]*)$//')
+	for e in 'A: package="app.katari.mpv"' \
+			"A: http://schemas.android.com/apk/res/android:versionCode(0x0101021b)=$version_code" \
+			"A: http://schemas.android.com/apk/res/android:versionName(0x0101021c)=\"$version\"" \
+			'A: http://schemas.android.com/apk/res/android:hasCode(0x0101000c)=false' \
+			'A: http://schemas.android.com/apk/res/android:extractNativeLibs(0x010104ea)=true'; do
+		grep -qxF "$e" <<<"$manifest" || die "$apk: the manifest lacks $e"
+	done
+	grep -qE '^E: (activity|activity-alias|service|receiver|provider)$' <<<"$manifest" &&
+		die "$apk has components"
+	# the meta-data: the version as a string, the glue level as an integer
+	grep -A2 -xF 'E: meta-data' <<<"$manifest" | grep -v -e '^E: meta-data$' -e '^--$' | paste - - |
+		sed 's|A: http://schemas.android.com/apk/res/android:||g' >"$addon/meta-data.txt"
+	diff -u - "$addon/meta-data.txt" <<-EOF || die "$apk has the wrong meta-data"
+		name(0x01010003)="katari.libmpv.version"	value(0x01010024)="$version"
+		name(0x01010003)="katari.libmpv.glue"	value(0x01010024)=$glue
+	EOF
+}
+for a in $want_abis; do
+	apk=$out/katari-mpv-$a-$version.apk
+	sign_apk "$addon/outputs/apk/release/katari-addon-$a-release-unsigned.apk" "$apk"
+	check_addon "$a" "$apk"
+done
+apks=("$addon"/outputs/apk/release/*.apk)
+[ ${#apks[@]} -eq "$(wc -w <<<"$want_abis")" ] ||
+	die "The add-on build made other APKs than one per ABI: ${apks[*]}"
+
 msg "Packing the corresponding source"
 bundle=$(mktemp -d)
 mkdir "$bundle/upstream"
@@ -255,8 +414,10 @@ tar -cf "$out/$name-sources.tar" -C "$bundle" README.txt upstream mpv-android
 rm -rf "$bundle"
 
 msg "Writing checksums"
-(cd "$out" && sha256sum -- "$name"* >"$name-SHA256SUMS.txt" && cat "$name-SHA256SUMS.txt")
+(cd "$out" && sha256sum -- "$name"* katari-mpv-*.apk >"$name-SHA256SUMS.txt" && cat "$name-SHA256SUMS.txt")
 
 msg "Native libraries in the AAR"
 unzip -lv "$aar" 'jni/*'
+msg "The mpv add-on"
+for a in $want_abis; do "$tools/apksigner" verify --print-certs "$out/katari-mpv-$a-$version.apk"; done
 ls -l "$out"

@@ -11,8 +11,13 @@ Fails if a library's soname isn't its file name, if the libraries depend on each
 cycle, or if one needs a library that isn't bundled and isn't one of the NDK's system
 libraries for the given API level.
 
+The output also names the release (version, the mpv add-on's versionCode) and its JNI glue
+level (MPVLib.GLUE_LEVEL), so a host can check the libraries it loads against the MPVLib it was
+built with. Format 2 added "versionCode" and "glue" to format 1.
+
 Usage: katari-load-order.py --readelf <llvm-readelf> --sysroot <NDK sysroot> --api <level>
-           --version <version> --abi <abi> [--abi <abi>]... <dir with an <abi>/ per ABI>
+           --version <version> --version-code <code> --glue <level>
+           --abi <abi> [--abi <abi>]... <dir with an <abi>/ per ABI>
 """
 
 import argparse
@@ -90,14 +95,18 @@ def main():
     p.add_argument("--sysroot", required=True)
     p.add_argument("--api", type=int, required=True)
     p.add_argument("--version", required=True)
+    p.add_argument("--version-code", type=int, required=True)
+    p.add_argument("--glue", type=int, required=True)
     p.add_argument("--abi", action="append", required=True, choices=sorted(TRIPLES))
     p.add_argument("dir")
     args = p.parse_args()
 
     json.dump({
-        "format": 1,
+        "format": 2,
         "name": f"libmpv-android-{args.version}",
         "version": args.version,
+        "versionCode": args.version_code,
+        "glue": args.glue,
         "loadOrder": {abi: load_order(args, abi) for abi in sorted(args.abi)},
     }, sys.stdout, indent=2)
     print()

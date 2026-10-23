@@ -1,0 +1,73 @@
+// The Katari mpv add-on (app.katari.mpv): an APK with no code that holds the native libraries
+// of one libmpv release for one ABI. Katari compiles MPVLib in from the AAR and loads these
+// libraries by absolute path, in the order of assets/libmpv/load-order.json.
+//
+// buildscripts/katari-release.sh builds it right after the AAR: it unpacks the AAR's jni/ and
+// assets/ into build/aar/, passes the release in -PkatariVersion, -PkatariVersionCode,
+// -PkatariGlue and -PkatariAbis, and signs the unsigned APKs this produces, one per ABI.
+apply plugin: 'com.android.application'
+
+def aar = file('build/aar')
+def katari = ['katariVersion', 'katariVersionCode', 'katariGlue', 'katariAbis']
+    .collectEntries { [it, findProperty(it)] }
+
+android {
+    namespace = 'app.katari.mpv'
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = 'app.katari.mpv'
+        minSdk = 29
+        targetSdk = 36
+
+        // placeholders let the other modules configure; preBuild requires the real values
+        versionCode = (katari.katariVersionCode ?: '1') as int
+        versionName = katari.katariVersion ?: 'dev'
+        manifestPlaceholders = [katariVersion: versionName, katariGlue: katari.katariGlue ?: '0']
+    }
+
+    sourceSets {
+        main.jniLibs.srcDirs = [new File(aar, 'jni')]
+        main.assets.srcDirs = [new File(aar, 'assets')]
+    }
+
+    packaging {
+        jniLibs {
+            // extracted at install (extractNativeLibs="true"), which halves the download
+            useLegacyPackaging = true
+            // the AAR's libraries are stripped already: ship them byte for byte
+            keepDebugSymbols += '**/*.so'
+        }
+    }
+
+    buildTypes {
+        release {
+            // R8 drops the empty R class, the only code AGP generates, so there's no classes.dex
+            minifyEnabled = true
+        }
+    }
+
+    // one APK per ABI, e.g. -PkatariAbis=arm64-v8a,armeabi-v7a
+    splits {
+        abi {
+            enable = true
+            reset()
+            include(*(katari.katariAbis?.split(',') ?: []))
+            universalApk = false
+        }
+    }
+}
+
+// no code: keep out the kotlin-stdlib that AGP's built-in Kotlin adds to every module
+configurations.matching { it.name.endsWith("RuntimeClasspath") }.configureEach {
+    exclude group: 'org.jetbrains.kotlin'
+}
+
+tasks.named('preBuild') {
+    doFirst {
+        def missing = katari.findAll { it.value == null }.keySet()
+        if (missing || !new File(aar, 'jni').isDirectory())
+            throw new GradleException("katari-addon is built by buildscripts/katari-release.sh " +
+                "(missing: ${missing ? missing.collect { "-P$it" }.join(', ') : 'build/aar/jni'})")
+    }
+}

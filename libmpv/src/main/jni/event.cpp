@@ -45,6 +45,20 @@ static void sendEventToJava(JNIEnv *env, int event)
     env->CallStaticVoidMethod(mpv_MPVLib, mpv_MPVLib_event, event);
 }
 
+static void sendEndFileToJava(JNIEnv *env, mpv_event_end_file *ef)
+{
+    // error is set (negative) only with MPV_END_FILE_REASON_ERROR
+    jstring jerror = NULL;
+    if (ef->error < 0)
+        jerror = env->NewStringUTF(mpv_error_string(ef->error));
+
+    env->CallStaticVoidMethod(mpv_MPVLib, mpv_MPVLib_eventEndFile_iiSl,
+        (jint) ef->reason, (jint) ef->error, jerror, (jlong) ef->playlist_entry_id);
+
+    if (jerror)
+        env->DeleteLocalRef(jerror);
+}
+
 static void sendLogMessageToJava(JNIEnv *env, mpv_event_log_message *msg)
 {
     // filter the most obvious cases of invalid utf-8, since Java would choke on it
@@ -97,6 +111,12 @@ void *event_thread(void *arg)
         case MPV_EVENT_PROPERTY_CHANGE:
             mp_property = (mpv_event_property*)mp_event->data;
             sendPropertyUpdateToJava(env, mp_property);
+            break;
+        case MPV_EVENT_END_FILE:
+            ALOGV("event: %s\n", mpv_event_name(mp_event->event_id));
+            // the details first, so that observers know them when event() arrives
+            sendEndFileToJava(env, (mpv_event_end_file*)mp_event->data);
+            sendEventToJava(env, mp_event->event_id);
             break;
         default:
             ALOGV("event: %s\n", mpv_event_name(mp_event->event_id));

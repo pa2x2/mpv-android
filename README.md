@@ -1,5 +1,7 @@
 # mpv for Android
 
+## Fork for my [Katari](https://github.com/pa2x2/katari) app for specific libmpv build.
+
 [![Build Status](https://github.com/mpv-android/mpv-android/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/mpv-android/mpv-android/actions/workflows/build.yml)
 
 mpv-android is a video player for Android based on [libmpv](https://github.com/mpv-player/mpv).

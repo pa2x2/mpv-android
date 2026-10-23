@@ -8,7 +8,7 @@ BUILD="./buildscripts"
 if [ "$1" == "build" ]; then
 	true
 elif [ "$1" == "clean" ]; then
-	rm -rf {app,.}/build app/src/main/{libs,obj}
+	rm -rf {app,libmpv,.}/build libmpv/src/main/{libs,obj}
 	exit 0
 else
 	exit 255
@@ -36,7 +36,7 @@ fi
 
 ### Native parts
 PREFIX32="$prefix32" PREFIX64="$prefix64" PREFIX_X64="$prefix_x64" PREFIX_X86="$prefix_x86" \
-ndk-build -C app/src/main -j$cores
+ndk-build -C libmpv/src/main -j$cores
 
 ### Java parts
 # Android's gradle plugin needs both of these to correctly strip libraries.
@@ -47,7 +47,10 @@ printf '%s\n' \
 	"ndkVersion=$v_ndk_n" "ndkRoot=$ANDROID_NDK_ROOT" >ndk.properties
 
 
-if [ -n "$DONT_BUILD_RELEASE" ]; then
+if [ -n "$LIBRARY_ONLY" ]; then
+	# just the libmpv AAR (libmpv/build/outputs/aar/libmpv-release.aar)
+	./gradlew :libmpv:assembleRelease
+elif [ -n "$DONT_BUILD_RELEASE" ]; then
 	./gradlew assembleDebug
 else
 	./gradlew assembleDebug assembleRelease

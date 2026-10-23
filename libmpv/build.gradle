@@ -1,0 +1,30 @@
+// libmpv and its JNI glue (MPVLib) as an Android library, for apps that embed mpv.
+// The native libraries come from buildscripts (ndk-build writes them to src/main/libs).
+apply plugin: 'com.android.library'
+
+android {
+    namespace 'is.xyz.mpv.libmpv'
+    compileSdk = 36
+
+    defaultConfig {
+        minSdkVersion 23
+
+        consumerProguardFiles 'consumer-rules.pro'
+
+        // Load information about the NDK to use
+        def props = new Properties()
+        def propfile = new File(rootDir, 'ndk.properties')
+        if (propfile.exists())
+            props.load(new FileInputStream(propfile))
+        ndkVersion = props.getProperty('ndkVersion', '')
+        ndkPath = props.getProperty('ndkRoot', '')
+    }
+
+    androidResources {
+        enable = false
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+}

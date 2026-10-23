@@ -65,6 +65,7 @@ jobs:
             echo "- \`*-sources.tar\`: the corresponding source (upstream archives and build scripts)"
             echo "- \`*-THIRD_PARTY_LICENSES.txt\`, \`*-third-party.json\`: licence inventory and texts"
             echo "- \`*-licence-evidence.txt\`: licence settings read back from the build"
+            echo "- \`*-load-order.json\`: the order in which to load the libraries, per ABI (also in the AAR)"
             echo
             echo '```'
             cat ./*-SHA256SUMS.txt

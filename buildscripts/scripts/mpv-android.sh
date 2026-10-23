@@ -38,6 +38,9 @@ fi
 PREFIX32="$prefix32" PREFIX64="$prefix64" PREFIX_X64="$prefix_x64" PREFIX_X86="$prefix_x86" \
 ndk-build -C libmpv/src/main -j$cores
 
+# just the native libraries (libmpv/src/main/libs/<abi>/)
+[ -n "$NATIVE_ONLY" ] && exit 0
+
 ### Java parts
 # Android's gradle plugin needs both of these to correctly strip libraries.
 # We could pass them directly to Gradle but by using this file it will persist

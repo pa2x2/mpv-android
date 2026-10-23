@@ -7,6 +7,8 @@
 #   build used plus this repository's build scripts
 # - ...-THIRD_PARTY_LICENSES.txt, ...-third-party.json: the licence inventory and texts
 # - ...-licence-evidence.txt: the licence settings read back from the build
+# - ...-load-order.json: the order in which a host loads the libraries, per ABI (MPVLib doesn't
+#   load them), generated from their DT_NEEDED entries; also in the AAR as assets/libmpv/
 # - ...-SHA256SUMS.txt
 # .github/workflows/katari-release.yml only runs this script. Needs bash 4 and python3.
 #
@@ -175,11 +177,28 @@ rm "$notices/.components" "$notices/.libcxx-LICENSE.txt"
 cp "$notices/THIRD_PARTY_LICENSES.txt" "$out/$name-THIRD_PARTY_LICENSES.txt"
 cp "$notices/third-party.json" "$out/$name-third-party.json"
 
+msg "Building the JNI glue"
+NATIVE_ONLY=1 ./buildall.sh -n
+
+msg "Writing the load order"
+want_abis=$(for arch in "${archs[@]}"; do abi "$arch"; done | sort | tr '\n' ' ')
+toolchain=$(echo "$ndk/toolchains/llvm/prebuilt/"*)
+# the libraries may only need the system libraries of the oldest Android the AAR supports
+api=$(sed -n 's/^APP_PLATFORM := android-//p' ../libmpv/src/main/jni/Application.mk)
+abi_args=()
+for a in $want_abis; do abi_args+=(--abi "$a"); done
+load_order () {
+	./katari-load-order.py --readelf "$toolchain/bin/llvm-readelf" --sysroot "$toolchain/sysroot" \
+		--api "$api" --version "$version" "${abi_args[@]}" "$1"
+}
+load_order ../libmpv/src/main/libs >"$notices/load-order.json"
+cp "$notices/load-order.json" "$out/$name-load-order.json"
+cat "$notices/load-order.json"
+
 msg "Building the AAR"
 LIBRARY_ONLY=1 ./buildall.sh -n
 
 # the AAR must hold exactly the ABIs asked for, each with every library
-want_abis=$(for arch in "${archs[@]}"; do abi "$arch"; done | sort | tr '\n' ' ')
 have_abis=$(unzip -Z1 "$aar" 'jni/*' | awk -F/ 'NF > 2 { print $2 }' | sort -u | tr '\n' ' ')
 [[ "$want_abis" == "$have_abis" ]] || die "The AAR has ABIs '$have_abis', expected '$want_abis'"
 for a in $want_abis; do
@@ -188,6 +207,14 @@ for a in $want_abis; do
 	done
 done
 unzip -Z1 "$aar" assets/libmpv/THIRD_PARTY_LICENSES.txt >/dev/null || die "The AAR lacks its licence notices"
+# and the load order must describe the libraries as packaged
+jni=$(mktemp -d)
+unzip -q "$aar" 'jni/*' -d "$jni"
+unzip -p "$aar" assets/libmpv/load-order.json | cmp -s - "$notices/load-order.json" ||
+	die "The AAR's assets/libmpv/load-order.json differs from the one written"
+load_order "$jni/jni" | cmp -s - "$notices/load-order.json" ||
+	die "The load order of the AAR's libraries differs from assets/libmpv/load-order.json"
+rm -rf "$jni"
 cp "$aar" "$out/$name.aar"
 
 msg "Packing the corresponding source"

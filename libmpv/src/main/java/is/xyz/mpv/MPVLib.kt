@@ -17,6 +17,15 @@ import android.view.Surface
  */
 @Suppress("unused")
 object MPVLib {
+    /**
+     * The level of the JNI glue between this class and `libplayer.so`: the `external` functions
+     * and what the native side looks up in Java, listed in `libmpv/glue/level-<N>.txt`. The
+     * native libraries of any release with the same level work with this class, so a host may
+     * load newer ones than it was built with. The release build fails if the glue changes and
+     * this doesn't go up.
+     */
+    const val GLUE_LEVEL: Int = 1
+
     external fun create(appctx: Context)
     external fun init()
     external fun destroy()

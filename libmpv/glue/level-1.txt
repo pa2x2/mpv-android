@@ -1,0 +1,49 @@
+# libmpv glue level 1
+#
+# The JNI contract between MPVLib, which a host compiles in from the AAR, and libplayer.so,
+# which comes with the native libraries (in the AAR, or in the Katari mpv add-on). A host
+# built with MPVLib.GLUE_LEVEL 1 can use the native libraries of any release whose glue
+# level is 1.
+#
+# Written by buildscripts/katari-glue.py from the AAR's classes.jar and libmpv/src/main/jni.
+# Don't edit it: when the glue changes, raise MPVLib.GLUE_LEVEL and run katari-glue.py write.
+
+# Native methods, implemented by libplayer.so: [static-]native <class>.<name> <descriptor>
+native is/xyz/mpv/MPVLib.attachSurface (Landroid/view/Surface;)V
+native is/xyz/mpv/MPVLib.command ([Ljava/lang/String;)V
+native is/xyz/mpv/MPVLib.create (Landroid/content/Context;)V
+native is/xyz/mpv/MPVLib.destroy ()V
+native is/xyz/mpv/MPVLib.detachSurface ()V
+native is/xyz/mpv/MPVLib.getPropertyBoolean (Ljava/lang/String;)Ljava/lang/Boolean;
+native is/xyz/mpv/MPVLib.getPropertyDouble (Ljava/lang/String;)Ljava/lang/Double;
+native is/xyz/mpv/MPVLib.getPropertyInt (Ljava/lang/String;)Ljava/lang/Integer;
+native is/xyz/mpv/MPVLib.getPropertyString (Ljava/lang/String;)Ljava/lang/String;
+native is/xyz/mpv/MPVLib.grabThumbnail (I)Landroid/graphics/Bitmap;
+native is/xyz/mpv/MPVLib.init ()V
+native is/xyz/mpv/MPVLib.observeProperty (Ljava/lang/String;I)V
+native is/xyz/mpv/MPVLib.setOptionString (Ljava/lang/String;Ljava/lang/String;)I
+native is/xyz/mpv/MPVLib.setPropertyBoolean (Ljava/lang/String;Z)V
+native is/xyz/mpv/MPVLib.setPropertyDouble (Ljava/lang/String;D)V
+native is/xyz/mpv/MPVLib.setPropertyInt (Ljava/lang/String;I)V
+native is/xyz/mpv/MPVLib.setPropertyString (Ljava/lang/String;Ljava/lang/String;)V
+
+# What libplayer.so looks up: class <class>, or [static-]method|field <class>.<name> <descriptor>
+class android/graphics/Bitmap
+class android/graphics/Bitmap$Config
+class is/xyz/mpv/MPVLib
+class java/lang/Boolean
+class java/lang/Double
+class java/lang/Integer
+method java/lang/Boolean.<init> (Z)V
+method java/lang/Double.<init> (D)V
+method java/lang/Integer.<init> (I)V
+static-field android/graphics/Bitmap$Config.ARGB_8888 Landroid/graphics/Bitmap$Config;
+static-method android/graphics/Bitmap.createBitmap ([IIILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;
+static-method is/xyz/mpv/MPVLib.event (I)V
+static-method is/xyz/mpv/MPVLib.eventEndFile (IILjava/lang/String;J)V
+static-method is/xyz/mpv/MPVLib.eventProperty (Ljava/lang/String;)V
+static-method is/xyz/mpv/MPVLib.eventProperty (Ljava/lang/String;D)V
+static-method is/xyz/mpv/MPVLib.eventProperty (Ljava/lang/String;J)V
+static-method is/xyz/mpv/MPVLib.eventProperty (Ljava/lang/String;Ljava/lang/String;)V
+static-method is/xyz/mpv/MPVLib.eventProperty (Ljava/lang/String;Z)V
+static-method is/xyz/mpv/MPVLib.logMessage (Ljava/lang/String;ILjava/lang/String;)V

@@ -10,6 +10,7 @@
 # - ...-load-order.json: the order in which a host loads the libraries, per ABI (MPVLib doesn't
 #   load them), generated from their DT_NEEDED entries; also in the AAR as assets/libmpv/
 # - ...-SHA256SUMS.txt
+# It also fails if the JNI glue changed without a new MPVLib.GLUE_LEVEL (see katari-glue.py).
 # .github/workflows/katari-release.yml only runs this script. Needs bash 4 and python3.
 #
 # Usage: ./katari-release.sh [--arch <arch>]... [--version <version>]
@@ -59,6 +60,11 @@ abi () {
 
 [[ "$version" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]] || die "Invalid version '$version'"
 for arch in "${archs[@]}"; do abi "$arch" >/dev/null; done
+
+# The JNI glue level the AAR's MPVLib declares; katari-glue.py checks it against classes.jar.
+glue=$(sed -n 's/^ *const val GLUE_LEVEL: Int = \([1-9][0-9]*\)$/\1/p' \
+	../libmpv/src/main/java/is/xyz/mpv/MPVLib.kt)
+[[ "$glue" =~ ^[1-9][0-9]*$ ]] || die "Can't read GLUE_LEVEL from MPVLib.kt"
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
 	die "The working tree has uncommitted changes, so the source bundle wouldn't match the build"
 fi
@@ -216,6 +222,9 @@ load_order "$jni/jni" | cmp -s - "$notices/load-order.json" ||
 	die "The load order of the AAR's libraries differs from assets/libmpv/load-order.json"
 rm -rf "$jni"
 cp "$aar" "$out/$name.aar"
+
+msg "Checking the JNI glue (level $glue)"
+./katari-glue.py check --aar "$aar" --level "$glue" --readelf "$toolchain/bin/llvm-readelf"
 
 msg "Packing the corresponding source"
 bundle=$(mktemp -d)

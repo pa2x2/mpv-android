@@ -4,17 +4,19 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.view.Surface
 
-// Wrapper for native library
-
+/**
+ * Wrapper for native library
+ *
+ * MPVLib doesn't load its native libraries: the host must load them before the first call to
+ * any of the `external` functions, once per process, dependencies first. The order for each ABI
+ * is in the `assets/libmpv/load-order.json` that comes with the libraries (in the AAR and as a
+ * release asset), and is `libplayer.so`, which holds these functions, last. An app that bundles
+ * the libraries in its own APK can call `System.loadLibrary("mpv")` and then `("player")`, and
+ * the linker finds the rest next to them. Using MPVLib before that fails with
+ * `UnsatisfiedLinkError` but leaves the class usable once the libraries are loaded.
+ */
 @Suppress("unused")
 object MPVLib {
-    init {
-        val libs = arrayOf("mpv", "player")
-        for (lib in libs) {
-            System.loadLibrary(lib)
-        }
-    }
-
     external fun create(appctx: Context)
     external fun init()
     external fun destroy()

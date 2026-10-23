@@ -1,10 +1,14 @@
 name: katari-release
 
-# Builds the LGPL libmpv AAR for Katari and publishes it with its corresponding source.
-# All the work is in buildscripts/katari-release.sh, which also runs locally.
+# Builds the LGPL libmpv AAR and the mpv add-on APKs for Katari and publishes them with their
+# corresponding source. All the work is in buildscripts/katari-release.sh, which also runs locally.
 # - push a tag libmpv-<version> (e.g. libmpv-2026-10-23-1): build and create the release;
-#   <version> is whatever follows "libmpv-" and names the release files
-# - run it by hand: build only (version "dev"), the files are attached to the run as an artifact
+#   <version> is whatever follows "libmpv-", names the release files and must be YYYY-MM-DD-N.
+#   The add-on APKs are signed with Katari's key, from the same repository secrets as Katari's
+#   release workflow (SIGNING_KEY, KEY_STORE_PASSWORD, ALIAS, KEY_PASSWORD); without all four
+#   the build fails
+# - run it by hand: build only (version "dev", APKs signed with a throwaway debug key), the files
+#   are attached to the run as an artifact
 
 on:
   push:
@@ -28,6 +32,24 @@ jobs:
           java-version: '21'
           distribution: temurin
 
+      - name: Decode the signing key
+        if: github.ref_type == 'tag'
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          ALIAS: ${{ secrets.ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          missing=()
+          for s in SIGNING_KEY KEY_STORE_PASSWORD ALIAS KEY_PASSWORD; do
+            [ -n "${!s}" ] || missing+=("$s")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing repository secrets: ${missing[*]}. The add-on is only published signed with Katari's key."
+            exit 1
+          fi
+          echo "$SIGNING_KEY" | base64 -d >"$RUNNER_TEMP/katari.keystore"
+
       - name: Install packages
         run: |
           sudo apt-get update
@@ -39,9 +61,13 @@ jobs:
           IN_CI: 1
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
+          KATARI_KEYSTORE: ${{ github.ref_type == 'tag' && format('{0}/katari.keystore', runner.temp) || '' }}
+          KATARI_KEYSTORE_PASSWORD: ${{ github.ref_type == 'tag' && secrets.KEY_STORE_PASSWORD || '' }}
+          KATARI_KEY_ALIAS: ${{ github.ref_type == 'tag' && secrets.ALIAS || '' }}
+          KATARI_KEY_PASSWORD: ${{ github.ref_type == 'tag' && secrets.KEY_PASSWORD || '' }}
         run: |
           if [[ "$REF_TYPE" == tag ]]; then
-            buildscripts/katari-release.sh --version "${REF_NAME#libmpv-}"
+            buildscripts/katari-release.sh --version "${REF_NAME#libmpv-}" --release
           else
             buildscripts/katari-release.sh
           fi
@@ -65,7 +91,10 @@ jobs:
             echo "- \`*-sources.tar\`: the corresponding source (upstream archives and build scripts)"
             echo "- \`*-THIRD_PARTY_LICENSES.txt\`, \`*-third-party.json\`: licence inventory and texts"
             echo "- \`*-licence-evidence.txt\`: licence settings read back from the build"
-            echo "- \`*-load-order.json\`: the order in which to load the libraries, per ABI (also in the AAR)"
+            echo "- \`*-load-order.json\`: the order in which to load the libraries, per ABI, with the JNI glue level (also in the AAR and the add-on)"
+            echo "- \`katari-mpv-<abi>-*.apk\`: the Katari mpv add-on (\`app.katari.mpv\`) for arm64-v8a, armeabi-v7a and x86_64 (emulators): the AAR's native libraries, signed with Katari's key"
+            echo
+            jq -r '"Add-on versionCode \(.versionCode), JNI glue level (MPVLib.GLUE_LEVEL) \(.glue)."' ./*-load-order.json
             echo
             echo '```'
             cat ./*-SHA256SUMS.txt

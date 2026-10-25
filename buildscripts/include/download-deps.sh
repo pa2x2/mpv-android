@@ -35,6 +35,19 @@ fetch () {
 	fi
 	mkdir "$dir"
 	tar -xf "$archive" -C "$dir" --strip-components=1
+	# a half-patched source would be taken as unpacked next time
+	apply_patches "$1" || { rm -rf "$dir"; exit 1; }
+}
+
+# apply_patches <dir>: this fork's changes to a dependency, patches/<dir>/*.patch in order.
+# They apply when the source is unpacked, so a deps/<dir> unpacked earlier needs removing.
+apply_patches () {
+	local p
+	for p in patches/$1/*.patch; do
+		[ -f "$p" ] || continue
+		echo "Applying $p"
+		patch -d "deps/$1" -p1 --forward --batch <"$p" || return 1
+	done
 }
 
 # fetch_git <dir> <url> <tag> <commit> [<submodule>...]

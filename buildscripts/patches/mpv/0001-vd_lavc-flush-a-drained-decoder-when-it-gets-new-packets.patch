@@ -1,0 +1,59 @@
+vd_lavc: flush a drained decoder when it gets new packets, not at EOF
+
+Flushing the decoder as soon as it reports EOF invalidates the frames it
+returned during the drain that weren't displayed yet. With hwdec=mediacodec
+those frames are MediaCodec output buffers, and av_mediacodec_release_buffer()
+silently skips rendering a buffer from before the last flush. The last frame
+of a file only comes out of the drain, so when the VO is recreated while
+paused at the end (keep-open, a new Android surface), the refresh seek decodes
+it, the decoder is flushed before the VO draws it, aimagereader times out
+waiting for the image and the window stays black.
+
+--- a/video/decode/vd_lavc.c
++++ b/video/decode/vd_lavc.c
+@@ -217,6 +217,13 @@
+     bool hwdec_failed;
+     bool hwdec_notified;
+     bool force_eof;
++    // avctx returned EOF after draining and is flushed before it takes a new
++    // packet. Flushing it at EOF instead would invalidate the frames it has
++    // returned that weren't displayed yet: a MediaCodec output buffer can't be
++    // rendered once its codec is flushed, so the last frame of a file, which
++    // only comes out of the drain, stayed black when the VO was recreated at
++    // the end.
++    bool drained;
+     int wait_for_keyframe; // max number of frames to wait for keyframe after reset
+ 
+     bool intra_only;
+@@ -904,6 +911,7 @@
+     if (ctx->avctx && avcodec_is_open(ctx->avctx))
+         avcodec_flush_buffers(ctx->avctx);
+     ctx->flushing = false;
++    ctx->drained = false;
+     ctx->hwdec_request_reinit = false;
+     // Wait for the first keyframe after reset to ensure the decoder state is
+     // valid. Seeking should already jump to a keyframe, so this is safe.
+@@ -1231,6 +1239,9 @@
+     if (!ctx->avctx)
+         return AVERROR_EOF;
+ 
++    if (ctx->drained)
++        reset_avctx(vd);
++
+     prepare_decoding(vd);
+ 
+     if (ctx->wait_for_keyframe > 0 && pkt) {
+@@ -1294,11 +1305,11 @@
+     if (ret < 0) {
+         if (ret == AVERROR_EOF) {
+             // If flushing was initialized earlier and has ended now, make it
+-            // start over in case we get new packets at some point in the future.
++            // start over once we get new packets (see drained).
+             // This must take the delay queue into account, so avctx returns EOF
+             // until the delay queue has been drained.
+             if (!ctx->num_delay_queue)
+-                reset_avctx(vd);
++                ctx->drained = true;
+         } else if (ret == AVERROR(EAGAIN)) {
+             // just retry after caller writes a packet
+         } else {

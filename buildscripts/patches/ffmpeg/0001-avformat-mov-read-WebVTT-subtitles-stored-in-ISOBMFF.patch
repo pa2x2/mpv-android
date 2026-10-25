@@ -1,0 +1,164 @@
+avformat/mov: read WebVTT subtitles stored in ISOBMFF ('wvtt')
+
+ISO/IEC 14496-30 stores WebVTT in MP4 as a 'wvtt' sample entry whose samples
+are boxes: a 'vttc' for each cue shown during the sample, with the text in
+'payl' and an optional identifier ('iden') and settings ('sttg'), or a 'vtte'
+for a stretch without cues. DASH and CMAF streams carry their subtitles this
+way. The demuxer had no mapping for the entry, so the stream stayed a data
+stream with no codec and players listed no subtitle track for it.
+
+Map 'wvtt' to the WebVTT codec and turn each sample into a WebVTT packet: the
+texts of its cues joined by line breaks, with the first cue's identifier and
+settings as side data, as the Matroska and WebVTT demuxers give them. Samples
+without cues are dropped once their timing has been accounted for.
+
+--- a/libavformat/mov.c
++++ b/libavformat/mov.c
+@@ -2801,6 +2801,9 @@
+                 id = (format == MOV_MP4_TTML_TAG || format == MOV_ISMV_TTML_TAG) ?
+                      AV_CODEC_ID_TTML : id;
+             }
++            /* ISO/IEC 14496-30 WebVTT; get_wvtt_packet() turns its samples into WebVTT packets. */
++            if (id <= 0 && format == MKTAG('w','v','t','t'))
++                id = AV_CODEC_ID_WEBVTT;
+ 
+             if (id > 0)
+                 st->codecpar->codec_type = AVMEDIA_TYPE_SUBTITLE;
+@@ -11600,6 +11603,114 @@
+     return 0;
+ }
+ 
++/*
++ * An ISO/IEC 14496-30 WebVTT sample is a list of boxes: a 'vttc' for each cue
++ * shown during the sample, with its text in 'payl' and an optional identifier
++ * ('iden') and settings ('sttg'), or a 'vtte' when no cue is shown. A WebVTT
++ * packet carries one cue's text with its identifier and settings as side data,
++ * so the cues' texts are joined by line breaks and the first cue's identifier
++ * and settings are kept. A sample without cues gives an empty packet.
++ */
++static int get_wvtt_packet(AVIOContext *pb, AVPacket *pkt, int src_size)
++{
++    const uint8_t *iden = NULL, *sttg = NULL;
++    int iden_size = 0, sttg_size = 0, text_size = 0, cues = 0;
++    int64_t pos = avio_tell(pb);
++    uint8_t *buf, *out;
++    int ret;
++
++    buf = av_malloc(src_size);
++    if (!buf)
++        return AVERROR(ENOMEM);
++    ret = ffio_read_size(pb, buf, src_size);
++    if (ret < 0)
++        goto end;
++
++    /* Two passes over the boxes: one to size the packet, one to fill it. */
++    out = NULL;
++    for (int pass = 0; pass < 2; pass++) {
++        const uint8_t *p = buf, *end = buf + src_size;
++        int written = 0;
++
++        if (pass == 1) {
++            ret = av_new_packet(pkt, text_size);
++            if (ret < 0)
++                goto end;
++            pkt->pos = pos;
++            out = pkt->data;
++        }
++        while (end - p >= 8) {
++            uint32_t box_size = AV_RB32(p), box_type = AV_RB32(p + 4);
++            const uint8_t *child = p + 8, *cue_end = p + box_size;
++
++            if (box_size < 8 || box_size > end - p) {
++                ret = AVERROR_INVALIDDATA;
++                goto end;
++            }
++            if (box_type == MKBETAG('v','t','t','c')) {
++                if (pass == 0)
++                    cues++;
++                while (cue_end - child >= 8) {
++                    uint32_t child_size = AV_RB32(child), child_type = AV_RB32(child + 4);
++                    const uint8_t *data = child + 8;
++                    int data_size = child_size - 8;
++
++                    if (child_size < 8 || child_size > cue_end - child) {
++                        ret = AVERROR_INVALIDDATA;
++                        goto end;
++                    }
++                    if (child_type == MKBETAG('p','a','y','l')) {
++                        if (pass == 0) {
++                            if (text_size > INT_MAX - data_size - 1) {
++                                ret = AVERROR_INVALIDDATA;
++                                goto end;
++                            }
++                            text_size += (text_size ? 1 : 0) + data_size;
++                        } else {
++                            if (written)
++                                out[written++] = '\n';
++                            memcpy(out + written, data, data_size);
++                            written += data_size;
++                        }
++                    } else if (pass == 0 && cues == 1 && child_type == MKBETAG('i','d','e','n')) {
++                        iden = data;
++                        iden_size = data_size;
++                    } else if (pass == 0 && cues == 1 && child_type == MKBETAG('s','t','t','g')) {
++                        sttg = data;
++                        sttg_size = data_size;
++                    }
++                    child += child_size;
++                }
++            }
++            p += box_size;
++        }
++    }
++
++    if (iden_size > 0) {
++        uint8_t *side = av_packet_new_side_data(pkt, AV_PKT_DATA_WEBVTT_IDENTIFIER, iden_size);
++        if (!side) {
++            ret = AVERROR(ENOMEM);
++            goto end;
++        }
++        memcpy(side, iden, iden_size);
++    }
++    if (sttg_size > 0) {
++        uint8_t *side = av_packet_new_side_data(pkt, AV_PKT_DATA_WEBVTT_SETTINGS, sttg_size);
++        if (!side) {
++            ret = AVERROR(ENOMEM);
++            goto end;
++        }
++        memcpy(side, sttg, sttg_size);
++    }
++    ret = 0;
++
++end:
++    if (ret < 0)
++        av_packet_unref(pkt);
++    av_free(buf);
++    return ret;
++}
++
+ static int get_eia608_packet(AVIOContext *pb, AVPacket *pkt, int src_size)
+ {
+     /* We can't make assumptions about the structure of the payload,
+@@ -11837,6 +11948,8 @@
+ 
+         if (st->codecpar->codec_id == AV_CODEC_ID_EIA_608 && sample->size > 8)
+             ret = get_eia608_packet(sc->pb, pkt, sample->size);
++        else if (st->codecpar->codec_id == AV_CODEC_ID_WEBVTT && st->codecpar->codec_tag == MKTAG('w','v','t','t'))
++            ret = get_wvtt_packet(sc->pb, pkt, sample->size);
+ #if CONFIG_IAMFDEC
+         else if (sc->iamf) {
+             int64_t pts, dts, pos, duration;
+@@ -11923,6 +12036,13 @@
+     if (st->discard == AVDISCARD_ALL)
+         goto retry;
+ 
++    /* A WebVTT sample without cues only marks the time no subtitle is shown. */
++    if (st->codecpar->codec_tag == MKTAG('w','v','t','t') && st->codecpar->codec_id == AV_CODEC_ID_WEBVTT &&
++        !pkt->size) {
++        av_packet_unref(pkt);
++        goto retry;
++    }
++
+     if (mov->aax_mode)
+         aax_filter(pkt->data, pkt->size, mov);
+ 

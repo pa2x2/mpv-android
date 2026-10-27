@@ -1,0 +1,79 @@
+context_android: make the EGL surface again when the window is resized
+
+When the Android surface changes size, android_reconfig() sets the window's
+buffer geometry, but the EGL surface keeps the buffers it already dequeued at
+the old size. The first frame drawn after the resize lands in one of them: the
+picture is drawn at the new size scaled by new/old, anchored to a corner, over
+what the buffer showed before. The next frame is right, so playback hides it,
+but a paused video keeps the broken frame on screen after a fold, a rotation
+or a split-screen resize until it plays again.
+
+Destroy and recreate the EGL surface when the size changes, as Android's
+GLSurfaceView does, so the redraw after the resize gets a buffer of the new
+size. The first reconfig, which sets the initial size, keeps the surface
+android_init() made.
+
+--- a/video/out/opengl/context_android.c
++++ b/video/out/opengl/context_android.c
+@@ -27,6 +27,7 @@
+     struct GL gl;
+     EGLDisplay egl_display;
+     EGLContext egl_context;
++    EGLConfig egl_config;
+     EGLSurface egl_surface;
+ };
+ 
+@@ -68,6 +69,7 @@
+     EGLConfig config;
+     if (!mpegl_create_context(ctx, p->egl_display, &p->egl_context, &config))
+         goto fail;
++    p->egl_config = config;
+ 
+     ANativeWindow *native_window = vo_android_native_window(ctx->vo);
+     EGLint format;
+@@ -103,6 +105,28 @@
+     return false;
+ }
+ 
++static bool android_recreate_surface(struct ra_ctx *ctx,
++                                     ANativeWindow *native_window)
++{
++    struct priv *p = ctx->priv;
++
++    eglMakeCurrent(p->egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE,
++                   EGL_NO_CONTEXT);
++    eglDestroySurface(p->egl_display, p->egl_surface);
++    p->egl_surface = eglCreateWindowSurface(p->egl_display, p->egl_config,
++                                    (EGLNativeWindowType)native_window, NULL);
++    if (p->egl_surface == EGL_NO_SURFACE) {
++        MP_ERR(ctx, "Could not recreate EGL surface!\n");
++        return false;
++    }
++    if (!eglMakeCurrent(p->egl_display, p->egl_surface, p->egl_surface,
++                        p->egl_context)) {
++        MP_ERR(ctx, "Failed to set context!\n");
++        return false;
++    }
++    return true;
++}
++
+ static bool android_reconfig(struct ra_ctx *ctx)
+ {
+     int w, h;
+@@ -114,6 +138,16 @@
+     if (native_window) {
+         int32_t current_format = ANativeWindow_getFormat(native_window);
+         ANativeWindow_setBuffersGeometry(native_window, w, h, current_format);
++
++        // The EGL surface keeps the buffers it already dequeued at the old
++        // size, so the first frame drawn after a resize lands in one of them,
++        // scaled into a corner over what it showed before. That frame stays
++        // on screen while paused. Make the surface again for the new size,
++        // as GLSurfaceView does.
++        if (ctx->vo->dwidth && ctx->vo->dheight &&
++            (w != ctx->vo->dwidth || h != ctx->vo->dheight) &&
++            !android_recreate_surface(ctx, native_window))
++            return false;
+     }
+ 
+     ctx->vo->dwidth = w;

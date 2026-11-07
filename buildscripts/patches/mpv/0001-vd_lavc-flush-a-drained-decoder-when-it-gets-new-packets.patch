@@ -25,7 +25,7 @@ waiting for the image and the window stays black.
      int wait_for_keyframe; // max number of frames to wait for keyframe after reset
  
      bool intra_only;
-@@ -904,6 +911,7 @@
+@@ -905,6 +912,7 @@
      if (ctx->avctx && avcodec_is_open(ctx->avctx))
          avcodec_flush_buffers(ctx->avctx);
      ctx->flushing = false;
@@ -33,7 +33,7 @@ waiting for the image and the window stays black.
      ctx->hwdec_request_reinit = false;
      // Wait for the first keyframe after reset to ensure the decoder state is
      // valid. Seeking should already jump to a keyframe, so this is safe.
-@@ -1231,6 +1239,9 @@
+@@ -1232,6 +1240,9 @@
      if (!ctx->avctx)
          return AVERROR_EOF;
  
@@ -43,7 +43,7 @@ waiting for the image and the window stays black.
      prepare_decoding(vd);
  
      if (ctx->wait_for_keyframe > 0 && pkt) {
-@@ -1294,11 +1305,11 @@
+@@ -1295,11 +1306,11 @@
      if (ret < 0) {
          if (ret == AVERROR_EOF) {
              // If flushing was initialized earlier and has ended now, make it

@@ -233,7 +233,7 @@ awk '/^The LLVM Project is under the Apache License/ { n++ } { b[n] = b[n] $0 "\
 submodule () { git -C deps/libplacebo rev-parse "HEAD:3rdparty/$1" | cut -c1-9; }
 # name | version | licence (SPDX) | homepage | where it is | licence files
 cat >"$notices/.components" <<EOF
-mpv|$v_mpv_base (git ${v_mpv:0:9}, $v_mpv_date)|LGPL-2.1-or-later|https://mpv.io/|libmpv.so|deps/mpv/LICENSE.LGPL
+mpv|$v_mpv|LGPL-2.1-or-later|https://mpv.io/|libmpv.so|deps/mpv/LICENSE.LGPL
 FFmpeg|$v_ffmpeg|LGPL-3.0-or-later|https://ffmpeg.org/|$(printf 'lib%s.so, ' "${ffmpeg_libs[@]}" | sed 's/, $//')|deps/ffmpeg/COPYING.LGPLv3 deps/ffmpeg/COPYING.GPLv3
 dav1d|$v_dav1d|BSD-2-Clause|https://code.videolan.org/videolan/dav1d|libavcodec.so (static)|deps/dav1d/COPYING
 Mbed TLS|$v_mbedtls|Apache-2.0|https://github.com/Mbed-TLS/mbedtls|libavformat.so (static)|deps/mbedtls/LICENSE

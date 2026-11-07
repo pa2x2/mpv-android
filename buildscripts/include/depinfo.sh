@@ -21,12 +21,8 @@ v_libxml2=2.15.4
 v_fontconfig=2.18.3
 v_curl=8.23.0
 v_libass=0.17.5
-v_libplacebo=7.360.1
-# mpv has no release that builds against FFmpeg 9, so it is pinned to the master
-# commit that upstream mpv-android's CI last built (2026-10-23)
-v_mpv=0fae4695470bf2c0c06762503292ee5379f62f62
-v_mpv_base=0.41.0
-v_mpv_date=20261023
+v_libplacebo=7.387.0
+v_mpv=0.42.0
 
 ## Source pins, checked by download-deps.sh
 # release archives by SHA-256, git checkouts by commit
@@ -43,8 +39,8 @@ sha_fontconfig=4f7b554a38cdf78c033f666c8871f3749e14a094f65a07f630c91ed0b43d35e3
 sha_libass=2dca25c0e0c837ddf00b52011b3f82cac1e4ddd3ad018227806b0c2288864acc
 sha_lua=b9e2e4aad6789b3b63a056d442f7b39f0ecfca3ae0f1fc0ae4e9614401b69f4b
 sha_curl=e3de77cfa6367083c776a26647fc9f633b538c06c3baa73d931a252ac8f72b49
-sha_mpv=a2cb3f3c1ad61b31c8df77aacb5ce106f6f47991df4e8b9e6975f94194fb386a
-commit_libplacebo=cee9b076f2c63104ccfd497fa79c39a867293ec4
+sha_mpv=bcfebbfa2b65a6d88dc97ea18117831072373e38b5785a2afb874ed4df5070dd
+commit_libplacebo=275f7dea27924cdd34ab2e6c20e448b6bc4fab65
 
 
 ## Dependency tree

@@ -94,4 +94,4 @@ fetch libass https://github.com/libass/libass/releases/download/$v_libass/libass
 fetch_git libplacebo https://github.com/haasn/libplacebo v$v_libplacebo $commit_libplacebo \
 	3rdparty/{glad,jinja,markupsafe,fast_float,Vulkan-Headers}
 
-fetch mpv https://github.com/mpv-player/mpv/archive/$v_mpv.tar.gz $sha_mpv mpv-$v_mpv.tar.gz
+fetch mpv https://github.com/mpv-player/mpv/archive/refs/tags/v$v_mpv.tar.gz $sha_mpv mpv-$v_mpv.tar.gz

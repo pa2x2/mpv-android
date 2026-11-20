@@ -25,7 +25,3 @@ android {
         main.assets.directories.add('build/generated/notices')
     }
 }
-
-dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-}

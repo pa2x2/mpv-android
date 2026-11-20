@@ -1,0 +1,21 @@
+buildscripts/include/depinfo.sh
+  s_a6ac6921d84a1c::t_e12dc72e59a70f 14,32
+buildscripts/patches/ffmpeg/0001-avformat-mov-read-WebVTT-subtitles-stored-in-ISOBMFF.patch
+  s_a6ac6921d84a1c::t_d9290a2918b5a9 17,27,142,151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4aca8cca2e6f4e44b86cf77a1d5c7c0dba5daca6",
+  "prompts": {},
+  "sessions": {
+    "s_a6ac6921d84a1c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "03d6573c-b0c8-42e4-9ccb-aecd57616f62",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kiryl Kvit <kiryl.kvit@gmail.com>"
+    }
+  }
+}

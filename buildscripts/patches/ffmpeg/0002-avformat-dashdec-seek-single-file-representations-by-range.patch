@@ -1,0 +1,66 @@
+avformat/dashdec: seek single-file representations by byte range
+
+A representation given only by a BaseURL, as the on-demand profile
+(SegmentBase) gives them, is one fragment covering the whole file, and
+seeking in it is left to the nested demuxer. That demuxer finds the target
+fragment from the sidx box, but the I/O context it reads from was always
+marked non-seekable, so jumping forward read every byte up to the target.
+Mark that context as seekable as the underlying input is, so the jump
+becomes a range request, and only allow seek_data() for such
+representations, where offsets in the nested stream match the input's.
+
+dash_read_seek() also ran before the discard flags the caller had just set
+were applied. Every representation opened at startup was seeked for real,
+and one selected after the last packet restarted from its beginning on the
+next read. Apply the flags first.
+
+--- a/libavformat/dashdec.c
++++ b/libavformat/dashdec.c
+@@ -1876,12 +1876,17 @@
+     return 0;
+ }
+ 
++static int is_single_file(const struct representation *pls)
++{
++    return pls->n_fragments == 1 && !pls->init_section &&
++           pls->fragments[0]->url_offset == 0 && pls->fragments[0]->size < 0;
++}
++
+ static int64_t seek_data(void *opaque, int64_t offset, int whence)
+ {
+     struct representation *v = opaque;
+-    if (v->n_fragments && !v->init_sec_data_len) {
++    if (is_single_file(v) && v->input)
+         return avio_seek(v->input, offset, whence);
+-    }
+ 
+     return AVERROR(ENOSYS);
+ }
+@@ -2028,6 +2033,12 @@
+         goto fail;
+     }
+ 
++    /* A representation that is one file can be seeked through its input,
++     * which lets the nested demuxer jump to the fragments a sidx box lists
++     * instead of reading up to them. */
++    if (!c->is_live && is_single_file(pls) && pls->input)
++        pls->pb.pub.seekable = pls->input->seekable;
++
+     pls->ctx->pb = &pls->pb.pub;
+     pls->ctx->io_open  = nested_io_open;
+ 
+@@ -2544,6 +2555,14 @@
+     if ((flags & AVSEEK_FLAG_BYTE) || c->is_live)
+         return AVERROR(ENOSYS);
+ 
++    /* The caller may have changed the discard flags since the last packet.
++     * Apply them first so that newly selected representations are seeked
++     * too instead of restarting from their beginning, and deselected ones
++     * are not seeked at all. */
++    recheck_discard_flags(s, c->videos, c->n_videos);
++    recheck_discard_flags(s, c->audios, c->n_audios);
++    recheck_discard_flags(s, c->subtitles, c->n_subtitles);
++
+     /* Seek in discarded streams with dry_run=1 to avoid reopening them */
+     for (i = 0; i < c->n_videos; i++) {
+         if (!ret)

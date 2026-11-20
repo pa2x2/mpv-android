@@ -1,0 +1,87 @@
+player: pause for cache when a selected external track runs dry
+
+handle_update_cache() decides paused-for-cache from the main demuxer's reader
+state alone. An external audio or video track, such as an audio track added
+with audio-add from a playlist of its own, has a demuxer of its own, and when
+its network source stalls, the audio output underruns and playback stops while
+the main demuxer still holds seconds of video: mpv stays out of the buffering
+state, paused-for-cache never turns true, and a client showing a loader from
+it shows a frozen picture and no sound instead, until the track's data arrives
+or its stream times out.
+
+Take the reader state of every selected external audio and video track's
+demuxer into account: an underrun in any of them counts, and buffering waits
+for whichever has the least cached ahead.
+
+--- a/player/playloop.c
++++ b/player/playloop.c
+@@ -725,7 +725,29 @@
+     struct demux_reader_state s;
+     demux_get_reader_state(mpctx->demuxer, &s);
+ 
+-    mpctx->demux_underrun |= s.underrun;
++    // A selected external audio or video track, such as an audio track from a
++    // file of its own, stalls playback as much as the main demuxer when its
++    // demuxer runs dry, so buffering follows whichever of them has the least
++    // cached ahead.
++    bool wait_idle = s.idle;
++    double wait_duration = s.ts_info.duration;
++    bool wait_underrun = s.underrun;
++    for (int n = 0; n < mpctx->num_tracks; n++) {
++        struct track *track = mpctx->tracks[n];
++        if (!track->selected || !track->is_external || !track->demuxer ||
++            track->demuxer == mpctx->demuxer ||
++            (track->type != STREAM_AUDIO && track->type != STREAM_VIDEO))
++            continue;
++        struct demux_reader_state ts;
++        demux_get_reader_state(track->demuxer, &ts);
++        wait_underrun |= ts.underrun;
++        if (!ts.idle && (wait_idle || ts.ts_info.duration < wait_duration)) {
++            wait_idle = false;
++            wait_duration = ts.ts_info.duration;
++        }
++    }
++
++    mpctx->demux_underrun |= wait_underrun;
+ 
+     int cache_buffer = 100;
+     bool use_pause_on_low_cache = opts->cache_pause && mpctx->play_dir > 0;
+@@ -739,8 +761,8 @@
+                                      mpctx->audio_status == STATUS_READY);
+     }
+ 
+-    bool is_low = use_pause_on_low_cache && !s.idle &&
+-                  s.ts_info.duration < opts->cache_pause_wait;
++    bool is_low = use_pause_on_low_cache && !wait_idle &&
++                  wait_duration < opts->cache_pause_wait;
+ 
+     // Enter buffering state only if there actually was an underrun (or if
+     // initial caching before playback restart is used).
+@@ -780,7 +802,7 @@
+ 
+     if (mpctx->paused_for_cache) {
+         cache_buffer =
+-            100 * MPCLAMP(s.ts_info.duration / opts->cache_pause_wait, 0, 0.99);
++            100 * MPCLAMP(wait_duration / opts->cache_pause_wait, 0, 0.99);
+         mp_set_timeout(mpctx, 0.2);
+     }
+ 
+@@ -801,15 +823,15 @@
+         if ((mpctx->cache_buffer == 100) != (cache_buffer == 100)) {
+             if (cache_buffer < 100) {
+                 MP_VERBOSE(mpctx, "Enter buffering (buffer went from %d%% -> %d%%) [%fs].\n",
+-                           mpctx->cache_buffer, cache_buffer, s.ts_info.duration);
++                           mpctx->cache_buffer, cache_buffer, wait_duration);
+             } else {
+                 double t = now - mpctx->cache_stop_time;
+                 MP_VERBOSE(mpctx, "End buffering (waited %f secs) [%fs].\n",
+-                           t, s.ts_info.duration);
++                           t, wait_duration);
+             }
+         } else {
+             MP_VERBOSE(mpctx, "Still buffering (buffer went from %d%% -> %d%%) [%fs].\n",
+-                       mpctx->cache_buffer, cache_buffer, s.ts_info.duration);
++                       mpctx->cache_buffer, cache_buffer, wait_duration);
+         }
+         mpctx->cache_buffer = cache_buffer;
+         force_update = true;

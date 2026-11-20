@@ -84,7 +84,6 @@ androidComponents {
 
 dependencies {
     implementation project(':libmpv')
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     implementation 'androidx.appcompat:appcompat:1.7.1'
     implementation 'androidx.recyclerview:recyclerview:1.4.0'
     implementation 'androidx.media:media:1.8.0'

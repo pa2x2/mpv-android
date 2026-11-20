@@ -10,15 +10,15 @@ v_sdk_platform=36
 v_sdk_build_tools=36.0.0
 
 v_lua=5.2.4
-v_dav1d=1.5.4
-v_ffmpeg=9.0.2
-v_unibreak=8.0
-v_harfbuzz=15.0.0
-v_fribidi=1.0.17
+v_dav1d=1.5.5
+v_ffmpeg=9.1
+v_unibreak=8.0.1
+v_harfbuzz=15.2.0
+v_fribidi=1.0.18
 v_freetype=2.15.0
-v_mbedtls=3.6.7
+v_mbedtls=3.6.8
 v_libxml2=2.15.4
-v_fontconfig=2.18.3
+v_fontconfig=2.18.4
 v_curl=8.23.0
 v_libass=0.17.5
 v_libplacebo=7.387.0
@@ -27,15 +27,15 @@ v_mpv=0.42.0
 ## Source pins, checked by download-deps.sh
 # release archives by SHA-256, git checkouts by commit
 
-sha_mbedtls=a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6
-sha_dav1d=686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5
-sha_ffmpeg=8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e
+sha_mbedtls=bc54b818e87f49c0b3281dd85d24adaede0e63b4e822e3fbd49c005a38b9595b
+sha_dav1d=ca96b1d0ba3f01f55de7231d775892b64994ba061aaeeaaa4f662a390b3abf9e
+sha_ffmpeg=1a4d394ae63d190a526cd052eb4415c156b5c5e2df37efab41a7de0b8fde2433
 sha_freetype=93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5
-sha_fribidi=6949dcde27d41cebad1fd741fcafc36d55a1020d2d872d4a6eb3914caabbada2
-sha_harfbuzz=968536e9abd782f07f7954044c0c4020199fcdd39b41d221ec42d2a3be4a44df
-sha_unibreak=9c4fad6e517338a098373acc9f35579ae2c325e6446666fb9ac2666ba15ceba4
+sha_fribidi=1de5e8073d035388b71d0b2d452b1da1f8caeea8a7702997b401fe1b6250727f
+sha_harfbuzz=e2ec49090744383cdbe7df808c1cedaafba06a97be8dc4211fe546ba585f12cb
+sha_unibreak=ac0dcc96c395bc86ff7f86f6b91d8b45bc8c39db775f3f1e73f947a11520737b
 sha_libxml2=98087fd181d9070724f3fbc65c7377db03038eb92bd882374daff44940138821
-sha_fontconfig=4f7b554a38cdf78c033f666c8871f3749e14a094f65a07f630c91ed0b43d35e3
+sha_fontconfig=95013637eff5f81d4871dd16cd098c273264c16d0f9f0b27cc43b81b2794bee3
 sha_libass=2dca25c0e0c837ddf00b52011b3f82cac1e4ddd3ad018227806b0c2288864acc
 sha_lua=b9e2e4aad6789b3b63a056d442f7b39f0ecfca3ae0f1fc0ae4e9614401b69f4b
 sha_curl=e3de77cfa6367083c776a26647fc9f633b538c06c3baa73d931a252ac8f72b49

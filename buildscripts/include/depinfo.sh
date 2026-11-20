@@ -16,7 +16,7 @@ v_unibreak=8.0
 v_harfbuzz=15.0.0
 v_fribidi=1.0.17
 v_freetype=2.15.0
-v_mbedtls=3.6.7
+v_mbedtls=3.6.8
 v_libxml2=2.15.4
 v_fontconfig=2.18.3
 v_curl=8.23.0
@@ -27,7 +27,7 @@ v_mpv=0.42.0
 ## Source pins, checked by download-deps.sh
 # release archives by SHA-256, git checkouts by commit
 
-sha_mbedtls=a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6
+sha_mbedtls=bc54b818e87f49c0b3281dd85d24adaede0e63b4e822e3fbd49c005a38b9595b
 sha_dav1d=ca96b1d0ba3f01f55de7231d775892b64994ba061aaeeaaa4f662a390b3abf9e
 sha_ffmpeg=8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e
 sha_freetype=93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5

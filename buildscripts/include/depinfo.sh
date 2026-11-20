@@ -10,7 +10,7 @@ v_sdk_platform=36
 v_sdk_build_tools=36.0.0
 
 v_lua=5.2.4
-v_dav1d=1.5.4
+v_dav1d=1.5.5
 v_ffmpeg=9.0.2
 v_unibreak=8.0
 v_harfbuzz=15.0.0
@@ -28,7 +28,7 @@ v_mpv=0.42.0
 # release archives by SHA-256, git checkouts by commit
 
 sha_mbedtls=a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6
-sha_dav1d=686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5
+sha_dav1d=ca96b1d0ba3f01f55de7231d775892b64994ba061aaeeaaa4f662a390b3abf9e
 sha_ffmpeg=8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e
 sha_freetype=93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5
 sha_fribidi=6949dcde27d41cebad1fd741fcafc36d55a1020d2d872d4a6eb3914caabbada2

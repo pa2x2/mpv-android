@@ -14,7 +14,7 @@ without cues are dropped once their timing has been accounted for.
 
 --- a/libavformat/mov.c
 +++ b/libavformat/mov.c
-@@ -2801,6 +2801,9 @@
+@@ -2924,6 +2924,9 @@
                  id = (format == MOV_MP4_TTML_TAG || format == MOV_ISMV_TTML_TAG) ?
                       AV_CODEC_ID_TTML : id;
              }
@@ -24,7 +24,7 @@ without cues are dropped once their timing has been accounted for.
  
              if (id > 0)
                  st->codecpar->codec_type = AVMEDIA_TYPE_SUBTITLE;
-@@ -11600,6 +11603,114 @@
+@@ -12699,6 +12702,114 @@
      return 0;
  }
  
@@ -139,7 +139,7 @@ without cues are dropped once their timing has been accounted for.
  static int get_eia608_packet(AVIOContext *pb, AVPacket *pkt, int src_size)
  {
      /* We can't make assumptions about the structure of the payload,
-@@ -11837,6 +11948,8 @@
+@@ -12936,6 +13047,8 @@
  
          if (st->codecpar->codec_id == AV_CODEC_ID_EIA_608 && sample->size > 8)
              ret = get_eia608_packet(sc->pb, pkt, sample->size);
@@ -148,7 +148,7 @@ without cues are dropped once their timing has been accounted for.
  #if CONFIG_IAMFDEC
          else if (sc->iamf) {
              int64_t pts, dts, pos, duration;
-@@ -11923,6 +12036,13 @@
+@@ -13022,6 +13135,13 @@
      if (st->discard == AVDISCARD_ALL)
          goto retry;
  

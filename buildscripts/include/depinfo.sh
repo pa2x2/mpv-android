@@ -11,7 +11,7 @@ v_sdk_build_tools=36.0.0
 
 v_lua=5.2.4
 v_dav1d=1.5.5
-v_ffmpeg=9.0.2
+v_ffmpeg=9.1
 v_unibreak=8.0.1
 v_harfbuzz=15.2.0
 v_fribidi=1.0.18
@@ -29,7 +29,7 @@ v_mpv=0.42.0
 
 sha_mbedtls=bc54b818e87f49c0b3281dd85d24adaede0e63b4e822e3fbd49c005a38b9595b
 sha_dav1d=ca96b1d0ba3f01f55de7231d775892b64994ba061aaeeaaa4f662a390b3abf9e
-sha_ffmpeg=8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e
+sha_ffmpeg=1a4d394ae63d190a526cd052eb4415c156b5c5e2df37efab41a7de0b8fde2433
 sha_freetype=93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5
 sha_fribidi=1de5e8073d035388b71d0b2d452b1da1f8caeea8a7702997b401fe1b6250727f
 sha_harfbuzz=e2ec49090744383cdbe7df808c1cedaafba06a97be8dc4211fe546ba585f12cb

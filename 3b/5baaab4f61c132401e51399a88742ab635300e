@@ -1,0 +1,19 @@
+buildscripts/patches/ffmpeg/0002-avformat-dashdec-seek-single-file-representations-by-range.patch
+  s_a6ac6921d84a1c::t_3312c05a516e65 1-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3b5baaab4f61c132401e51399a88742ab635300e",
+  "prompts": {},
+  "sessions": {
+    "s_a6ac6921d84a1c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "03d6573c-b0c8-42e4-9ccb-aecd57616f62",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kiryl Kvit <kiryl.kvit@gmail.com>"
+    }
+  }
+}
